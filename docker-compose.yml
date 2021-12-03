@@ -15,6 +15,7 @@ services:
       - MYSQL_USER=test
       - MYSQL_PASSWORD=test
       - TZ=Asia/Tokyo
+    platform: linux/x86_64
   php:
     build:
       context: ./php7.2

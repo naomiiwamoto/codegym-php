@@ -1,12 +1,12 @@
 <?php
 session_start();
-require('dbconnect.php');
+require('dbconnect.php'); //ログイン画面
 
 if (isset($_SESSION['id']) && $_SESSION['time'] + 3600 > time()) {
     // ログインしている
     $_SESSION['time'] = time();
 
-    $members = $db->prepare('SELECT * FROM members WHERE id=?');
+    $members = $db->prepare('SELECT * FROM members WHERE id=?'); //
     $members->execute(array($_SESSION['id']));
     $member = $members->fetch();
 } else {
@@ -65,11 +65,78 @@ function h($value)
     return htmlspecialchars($value, ENT_QUOTES, 'UTF-8');
 }
 
+
+function getFavCount($post_id, $db)
+{ //getFavCount 関数
+
+    $count = $db->prepare("SELECT COUNT(*) AS cnt FROM favorites WHERE member_id=? AND post_id=?");  //変数に格納　favoritesの中身を検索
+    $count->execute(array(
+        $_SESSION['id'],
+        $post_id
+    )); //探す実行
+    $record = $count->fetch();
+    return $record['cnt'];
+}
+
+
+
+
 // 本文内のURLにリンクを設定します
 function makeLink($value)
 {
     return mb_ereg_replace("(https?)(://[[:alnum:]\+\$\;\?\.%,!#~*/:@&=_-]+)", '<a href="\1\2">\1\2</a>', $value);
 }
+
+
+
+
+//いいねぼたんが押された際の情報の確認と（db）に追加/削除
+
+
+if ($_GET['okini']) { //いいねボタンがおされたか判定
+    $count = $db->prepare("SELECT COUNT(*) AS cnt FROM favorites WHERE member_id=? AND post_id=?");  //変数に格納　favoritesの中身を検索
+    $count->execute(array(
+        $member['id'],
+        $_GET['okini']
+    )); //探す実行
+    $record = $count->fetch(); //数字として取り出す
+    if ($record['cnt'] > 0) { //一個以上の場合は
+        $del = $db->prepare('DELETE FROM favorites WHERE member_id=? AND post_id=? '); //削除できる
+        $del->execute(array(
+            $member['id'],
+            $_GET['okini'],
+        ));
+    } else { //ない場合は登録
+        $iine = $db->prepare("INSERT INTO favorites SET member_id=?,post_id=?, created=NOW()"); //はいっていない場合情報を導入
+        $iine->execute(array(
+            $member['id'],
+            $_GET['okini']
+        ));
+    }
+
+    header('Location: index.php');
+    exit();
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 ?>
 <!DOCTYPE html>
 <html lang="ja">
@@ -113,15 +180,34 @@ function makeLink($value)
                     <p><?php echo makeLink(h($post['message'])); ?><span class="name">（<?php echo h($post['name']); ?>）</span>[<a href="index.php?res=<?php echo h($post['id']); ?>">Re</a>]</p>
 
                     <p class="day">
+
+                        <!-- いいね機能 グレーのハート-->
+                        <a href="index.php?okini=<?php echo $post['id']; ?>">
+
+                            <!-- index.phpにpost_idを送信 -->
+                            <?php if (getFavCount($post['id'], $db) > 0) { ?>
+                                <img methottype="button" class="favorite-image" src="images/heart-solid-red.svg" name="red" method="get">
+                            <?php } else { ?>
+                                <img methottype="button" class="favorite-image" src="images/heart-solid-gray.svg" name="okini" method="get">
+                            <?php } ?>
+                        </a>
+                        <?php if (getFavCount($post['id'], $db) > 0) { ?>
+                            <span style="color:gray;"> <?php echo getFavCount($post['id'], $db); ?></span>
+                        <?php } ?>
+
+
                         <!-- 課題：リツイートといいね機能の実装 -->
                         <span class="retweet">
                             <img class="retweet-image" src="images/retweet-solid-gray.svg"><span style="color:gray;">12</span>
                         </span>
-                        <span class="favorite">
-                            <img class="favorite-image" src="images/heart-solid-gray.svg"><span style="color:gray;">34</span>
-                        </span>
+
+
+
+
+
 
                         <a href="view.php?id=<?php echo h($post['id']); ?>"><?php echo h($post['created']); ?></a>
+
                         <?php
                         if ($post['reply_post_id'] > 0) :
                         ?><a href="view.php?id=<?php echo h($post['reply_post_id']); ?>">

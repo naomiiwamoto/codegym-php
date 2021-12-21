@@ -65,7 +65,6 @@ function h($value)
     return htmlspecialchars($value, ENT_QUOTES, 'UTF-8');
 }
 
-
 //いいね件数を取得
 
 function FavCount($post_id, $db)
@@ -77,12 +76,8 @@ function FavCount($post_id, $db)
     return $posts['cnt'];
 }
 
-
-
-
-
 function getFavCount($post_id, $db)
-{ //getFavCount 関数　
+{ //getFavCount 関数
 
     $count = $db->prepare("SELECT COUNT(*) AS cnt FROM favorites WHERE member_id=? AND post_id=?");  //変数に格納　favoritesの中身を検索
     $count->execute(array(
@@ -99,11 +94,7 @@ function makeLink($value)
     return mb_ereg_replace("(https?)(://[[:alnum:]\+\$\;\?\.%,!#~*/:@&=_-]+)", '<a href="\1\2">\1\2</a>', $value);
 }
 
-
-
-
 //いいねボタンが押された際の情報の確認と（db）に追加/削除
-
 
 if ($_GET['okini']) { //いいねボタンがおされたか判定
     $count = $db->prepare("SELECT COUNT(*) AS cnt FROM favorites WHERE member_id=? AND post_id=?");  //変数に格納　favoritesの中身を検索

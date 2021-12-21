@@ -1,12 +1,12 @@
 <?php
 session_start();
-require('dbconnect.php'); //ログイン画面
+require('dbconnect.php');
 
 if (isset($_SESSION['id']) && $_SESSION['time'] + 3600 > time()) {
     // ログインしている
     $_SESSION['time'] = time();
 
-    $members = $db->prepare('SELECT * FROM members WHERE id=?'); //
+    $members = $db->prepare('SELECT * FROM members WHERE id=?');
     $members->execute(array($_SESSION['id']));
     $member = $members->fetch();
 } else {
@@ -66,8 +66,23 @@ function h($value)
 }
 
 
+//いいね件数を取得
+
+function FavCount($post_id, $db)
+{
+    $post = $db->prepare('SELECT COUNT(*) AS cnt FROM favorites WHERE post_id=?');
+    $post->execute(array($post_id));
+    $posts = $post->fetch();
+
+    return $posts['cnt'];
+}
+
+
+
+
+
 function getFavCount($post_id, $db)
-{ //getFavCount 関数
+{ //getFavCount 関数　
 
     $count = $db->prepare("SELECT COUNT(*) AS cnt FROM favorites WHERE member_id=? AND post_id=?");  //変数に格納　favoritesの中身を検索
     $count->execute(array(
@@ -78,9 +93,6 @@ function getFavCount($post_id, $db)
     return $record['cnt'];
 }
 
-
-
-
 // 本文内のURLにリンクを設定します
 function makeLink($value)
 {
@@ -90,7 +102,7 @@ function makeLink($value)
 
 
 
-//いいねぼたんが押された際の情報の確認と（db）に追加/削除
+//いいねボタンが押された際の情報の確認と（db）に追加/削除
 
 
 if ($_GET['okini']) { //いいねボタンがおされたか判定
@@ -117,26 +129,6 @@ if ($_GET['okini']) { //いいねボタンがおされたか判定
     header('Location: index.php');
     exit();
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 ?>
 <!DOCTYPE html>
 <html lang="ja">
@@ -181,7 +173,7 @@ if ($_GET['okini']) { //いいねボタンがおされたか判定
 
                     <p class="day">
 
-                        <!-- いいね機能 グレーのハート-->
+                        <!-- いいね機能　-->
                         <a href="index.php?okini=<?php echo $post['id']; ?>">
 
                             <!-- index.phpにpost_idを送信 -->
@@ -191,19 +183,16 @@ if ($_GET['okini']) { //いいねボタンがおされたか判定
                                 <img methottype="button" class="favorite-image" src="images/heart-solid-gray.svg" name="okini" method="get">
                             <?php } ?>
                         </a>
-                        <?php if (getFavCount($post['id'], $db) > 0) { ?>
-                            <span style="color:gray;"> <?php echo getFavCount($post['id'], $db); ?></span>
+                        <?php if (FavCount($post['id'], $db) > 0) { ?>
+                            <!-- いいね件数の表示 -->
+                            <span style="color:gray;"> <?php echo FavCount($post['id'], $db); ?></span>
                         <?php } ?>
 
 
-                        <!-- 課題：リツイートといいね機能の実装 -->
+                        <!-- 課題：リツイート機能 -->
                         <span class="retweet">
                             <img class="retweet-image" src="images/retweet-solid-gray.svg"><span style="color:gray;">12</span>
                         </span>
-
-
-
-
 
 
                         <a href="view.php?id=<?php echo h($post['id']); ?>"><?php echo h($post['created']); ?></a>

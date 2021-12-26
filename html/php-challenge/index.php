@@ -59,17 +59,135 @@ if (isset($_REQUEST['res'])) {
     $message = '@' . $table['name'] . ' ' . $table['message'];
 }
 
+// 本文内のURLにリンクを設定します
+function makeLink($value)
+{
+    return mb_ereg_replace("(https?)(://[[:alnum:]\+\$\;\?\.%,!#~*/:@&=_-]+)", '<a href="\1\2">\1\2</a>', $value);
+}
+
 // htmlspecialcharsのショートカット
 function h($value)
 {
     return htmlspecialchars($value, ENT_QUOTES, 'UTF-8');
 }
 
-// 本文内のURLにリンクを設定します
-function makeLink($value)
+///いいね件数を取得
+
+function FavCount($post_id, $db)
 {
-    return mb_ereg_replace("(https?)(://[[:alnum:]\+\$\;\?\.%,!#~*/:@&=_-]+)", '<a href="\1\2">\1\2</a>', $value);
+    $post = $db->prepare('SELECT COUNT(*) AS cnt FROM favorites WHERE post_id=?');
+    $post->execute(array($post_id));
+    $posts = $post->fetch();
+
+    return $posts['cnt'];
 }
+
+function getFavCount($post_id, $db)
+{ //いいねfavoritesの中身を検索
+
+    $count = $db->prepare("SELECT COUNT(*) AS cnt FROM favorites WHERE member_id=? AND post_id=?");  //変数に格納　favoritesの中身を検索
+    $count->execute(array(
+        $_SESSION['id'],
+        $post_id
+    )); //探す実行
+    $record = $count->fetch();
+    return $record['cnt'];
+}
+
+//元投稿かどうかを確認する
+function originalpost($post_id, $db)
+{
+    $data = $db->prepare("SELECT * FROM posts WHERE id=?");
+    $data->execute(array($post_id));
+    $data1 = $data->fetch(); //結果
+
+    return $data1;
+}
+
+//元投稿からrtを探す
+function retweetCount($post_id, $db)
+{
+    $rt = $db->prepare("SELECT COUNT(*) AS cnt FROM posts WHERE member_id=? AND retweet_post_id=?");
+    $rt->execute(array(
+        $_SESSION['id'],
+        $post_id
+    ));
+    $rtw = $rt->fetch(); //結果
+    return $rtw['cnt'];
+}
+
+
+
+//実際にrtボタンが押された時の流れ
+
+if ($_GET['rt']) { //リツートボタンを押されたか判断して
+    $data1 = originalpost($_GET['rt'], $db); //idを検索して、どの行か確認する必要がある
+    if ($data1['retweet_post_id'] = 0) { //元投稿か調べる
+    } else {
+        $enter = $db->prepare("INSERT INTO posts SET member_id=?,retweet_post_id=?, created=NOW()"); //元投稿じゃない場合は情報を導入
+        $enter->execute(array(
+            $_SESSION['id'],
+            $_GET['rt']
+        ));
+    }
+    if ($data1 = retweetCount($_GET['rt'], $db) > 0) { //id $メンバーidとリツイートポストidで検索をする　
+        //カウントで０より大きい場合は、すでにリツイートされていて、自分のリツイートが存在する。//削除できる
+        $del = $db->prepare('DELETE FROM posts WHERE member_id=? AND retweet_post_id=? '); //一致した場合は削除できる
+        $del->execute(array(
+            $_SESSION['id'],
+            $_GET['rt']
+        ));
+    }
+    header('Location: index.php');
+    exit();
+    print var_dump($data1);
+}
+
+
+
+//リツートボタンを押されたか判断して
+//idを検索して、どの行か確認する必要がある
+//元投稿か調べる
+// $data1のidを取り出す idをリツイートポストidとして使用。
+//id $メンバーidとリツイートポストidで検索をする　カウントで０より大きい場合は、すでにリツイートされていて、自分のリツイートが存在する。
+//else 0の場合は、自分のリツイートが存在しない。
+//元投稿じゃない場合
+//リツイート投稿を探す
+//ある場合は削除できる
+
+
+
+
+
+
+
+//いいねボタンが押された際の情報の確認と（db）に追加/削除
+
+if ($_GET['okini']) { //いいねボタンがおされたか判定
+    $count = $db->prepare("SELECT COUNT(*) AS cnt FROM favorites WHERE member_id=? AND post_id=?");  //変数に格納　favoritesの中身を検索
+    $count->execute(array(
+        $member['id'],
+        $_GET['okini']
+    )); //探す実行
+    $record = $count->fetch(); //数字として取り出す
+    if ($record['cnt'] > 0) { //一個以上の場合は
+        $del = $db->prepare('DELETE FROM favorites WHERE member_id=? AND post_id=? '); //削除できる
+        $del->execute(array(
+            $member['id'],
+            $_GET['okini'],
+        ));
+    } else { //ない場合は登録
+        $iine = $db->prepare("INSERT INTO favorites SET member_id=?,post_id=?, created=NOW()"); //はいっていない場合情報を導入
+        $iine->execute(array(
+            $member['id'],
+            $_GET['okini']
+        ));
+    }
+
+    header('Location: index.php');
+    exit();
+}
+
 ?>
 <!DOCTYPE html>
 <html lang="ja">
@@ -113,15 +231,44 @@ function makeLink($value)
                     <p><?php echo makeLink(h($post['message'])); ?><span class="name">（<?php echo h($post['name']); ?>）</span>[<a href="index.php?res=<?php echo h($post['id']); ?>">Re</a>]</p>
 
                     <p class="day">
-                        <!-- 課題：リツイートといいね機能の実装 -->
-                        <span class="retweet">
-                            <img class="retweet-image" src="images/retweet-solid-gray.svg"><span style="color:gray;">12</span>
-                        </span>
-                        <span class="favorite">
-                            <img class="favorite-image" src="images/heart-solid-gray.svg"><span style="color:gray;">34</span>
-                        </span>
+
+                        <!-- いいね機能　-->
+                        <a href="index.php?okini=<?php echo $post['id']; ?>">
+
+                            <!-- index.phpにpost_idを送信 -->
+                            <?php if (getFavCount($post['id'], $db) > 0) { ?>
+                                <img methottype="button" class="favorite-image" src="images/heart-solid-red.svg" name="red" method="get">
+                            <?php } else { ?>
+                                <img methottype="button" class="favorite-image" src="images/heart-solid-gray.svg" name="okini" method="get">
+                            <?php } ?>
+                        </a>
+                        <?php if (FavCount($post['id'], $db) > 0) { ?>
+                            <!-- いいね件数の表示 -->
+                            <span style="color:gray;"> <?php echo FavCount($post['id'], $db); ?></span>
+                        <?php } ?>
+
+                        <!-- リツイート機能 -->
+
+                        <a href="index.php?rt=<?php echo $post['id']; ?>">
+                            <?php if (
+                                retweetCount($post_id, $db) < 0
+                            ) { ?>
+                                <img methottype="button" class="retweet-image" src="images/retweet-solid-gray.svg" name="rt" method="get">
+                            <?php } else { ?>
+                                <?php echo h($member['name']); ?>さんがリツイートをしました。
+                                <img methottype="button" class="retweet-image" src="images/retweet-solid-blue.svg" name="rt" method="get" alt="<?php echo h($post['name']); ?>">
+                                <p><?php echo h($post['message']); ?>
+                                    <span class="retweet">(<?php echo h($post['name']); ?>)
+                                    </span>
+                                <?php } ?>
+                                </p>
+
+                                <span style="color:gray;">12</span>
+                                </span>
+                        </a>
 
                         <a href="view.php?id=<?php echo h($post['id']); ?>"><?php echo h($post['created']); ?></a>
+
                         <?php
                         if ($post['reply_post_id'] > 0) :
                         ?><a href="view.php?id=<?php echo h($post['reply_post_id']); ?>">

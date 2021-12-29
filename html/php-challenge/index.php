@@ -101,7 +101,11 @@ function originalpost($post_id, $db)
     $data->execute(array($post_id));
     $data1 = $data->fetch(); //結果
 
-    return $data1;
+    if ($data1['retweet_post_id'] === '0') {
+        return true;
+    } else {
+        return false;
+    }
 }
 
 //元投稿からrtを探す
@@ -116,49 +120,70 @@ function retweetCount($post_id, $db)
     return $rtw['cnt'];
 }
 
+//idとmember_idの比較
+function rtpost($post_id, $db)
+{
+    $data2 = $db->prepare("SELECT COUNT(*) AS cnt FROM posts WHERE id=? AND member_id=? AND retweet_post_id>0");
+    $data2->execute(array(
+        $post_id,
+        $_SESSION['id']
 
-
-//実際にrtボタンが押された時の流れ
-
-if ($_GET['rt']) { //リツートボタンを押されたか判断して
-    $data1 = originalpost($_GET['rt'], $db); //idを検索して、どの行か確認する必要がある
-    if ($data1['retweet_post_id'] = 0) { //元投稿か調べる
-    } else {
-        $enter = $db->prepare("INSERT INTO posts SET member_id=?,retweet_post_id=?, created=NOW()"); //元投稿じゃない場合は情報を導入
-        $enter->execute(array(
-            $_SESSION['id'],
-            $_GET['rt']
-        ));
-    }
-    if ($data1 = retweetCount($_GET['rt'], $db) > 0) { //id $メンバーidとリツイートポストidで検索をする　
-        //カウントで０より大きい場合は、すでにリツイートされていて、自分のリツイートが存在する。//削除できる
-        $del = $db->prepare('DELETE FROM posts WHERE member_id=? AND retweet_post_id=? '); //一致した場合は削除できる
-        $del->execute(array(
-            $_SESSION['id'],
-            $_GET['rt']
-        ));
-    }
-    header('Location: index.php');
-    exit();
-    print var_dump($data1);
+    ));
+    $data3 = $data2->fetch(); //結果
+    return $data3['cnt'];
 }
 
 
 
-//リツートボタンを押されたか判断して
-//idを検索して、どの行か確認する必要がある
-//元投稿か調べる
-// $data1のidを取り出す idをリツイートポストidとして使用。
-//id $メンバーidとリツイートポストidで検索をする　カウントで０より大きい場合は、すでにリツイートされていて、自分のリツイートが存在する。
-//else 0の場合は、自分のリツイートが存在しない。
-//元投稿じゃない場合
-//リツイート投稿を探す
-//ある場合は削除できる
+//リツイート件数
+function rtCount($post_id, $db)
+{
+    $count = $db->prepare('SELECT COUNT(*) AS cnt FROM posts WHERE retweet_post_id=? ');
+    $count->execute(array(
+        $post_id,
+    ));
+    $rtcount = $count->fetch();
 
 
+    return $rtcount['cnt'];
+}
 
+//idを元にretweet_post_idを取得
 
+function getRetweetPostIdById($id, $db)
+{
+    $posts = $db->prepare('SELECT retweet_post_id FROM posts WHERE id=? ');
+    $posts->execute(
+        array($id)
+    );
+    $posts1 = $posts->fetch();
 
+    return $posts1['retweet_post_id'];
+}
+
+//リツイートをした時の元投稿の内容と元投稿を投稿した人の情報をひっぱってくる
+
+function getRetweetPost($db)
+{
+    $rtposts = $db->prepare('SELECT 
+    posts.member_id,
+    posts.message, 
+    members.picture,
+    members.name
+    members.id
+    FROM
+    posts
+    INNER JOIN
+    members
+    ON
+    posts.member_id = members.id');
+    $rtposts->execute();
+    $getrtposts = $rtposts->fetch();
+
+    echo getRetweetPost($db);
+
+    return $getrtposts;
+}
 
 
 //いいねボタンが押された際の情報の確認と（db）に追加/削除
@@ -182,6 +207,47 @@ if ($_GET['okini']) { //いいねボタンがおされたか判定
             $member['id'],
             $_GET['okini']
         ));
+    }
+
+    header('Location: index.php');
+    exit();
+}
+
+
+//実際にrtボタンが押された時の流れ 
+
+if ($_GET['rt']) { //リツートボタンを押されたか判断して $data1 = originalpost($_GET['rt'], $db); //idを検索して、どの行か確認する必要がある
+    if (originalpost($_GET['rt'], $db)) { //元投稿か調べる
+        if (retweetCount($_GET['rt'], $db) > 0) { //元投稿の場合は$メンバーidとリツイートポストidで検索をする　
+            //カウントで０より大きい場合は、すでにリツイートされていて、自分のリツイートが存在する。//削除できる
+            $del = $db->prepare('DELETE FROM posts WHERE member_id=? AND retweet_post_id=? '); //一致した場合は削除できる
+            $del->execute(array(
+                $_SESSION['id'],
+                $_GET['rt']
+            ));
+        } else {
+            $enter = $db->prepare("INSERT INTO posts SET member_id=?,retweet_post_id=?, created=NOW()"); // データがない場合は情報を導入
+            $enter->execute(array(
+                $_SESSION['id'],
+                $_GET['rt']
+            ));
+        }
+    } else { //リツイート投稿の場合は   getRetweetPostIdById($_GET['rt'], $db)
+        $rtid = getRetweetPostIdById($_GET['rt'], $db); //idを元にretweet_post_idを取得
+        if (retweetCount($rtid, $db) > 0) { //リツイート投稿のidを元投稿のidに変換した値がretweet_post_idにはいる。また$member_idとretweet_post_idを検索をする　
+            //カウントで０より大きい場合は、すでにリツイートされていて、自分のリツイートが存在する。//削除できる
+            $del = $db->prepare('DELETE FROM posts WHERE member_id=? AND retweet_post_id=? '); //一致した場合は削除できる
+            $del->execute(array(
+                $_SESSION['id'],
+                $rtid
+            ));
+        } else {
+            $enter = $db->prepare("INSERT INTO posts SET member_id=?,retweet_post_id=?, created=NOW()"); // データがない場合は(自分以外の場合は)情報を導入
+            $enter->execute(array(
+                $_SESSION['id'],
+                $rtid
+            ));
+        }
     }
 
     header('Location: index.php');
@@ -226,49 +292,64 @@ if ($_GET['okini']) { //いいねボタンがおされたか判定
             <?php
             foreach ($posts as $post) :
             ?>
+                <?php if (originalpost($post['id'], $db) === true) {
+                    if (getRetweetPostIdById($post['id'], $db) > 0); //idを元にretweet_post_idを取得
+                    //元投稿
+                ?><?php } else { //リツイート投稿  
+                    echo h($post['name']), "さんがリツイートしました";;
+
+                    ?>
+                <div class="rt">
+
+                <?php } ?>
                 <div class="msg">
                     <img src="member_picture/<?php echo h($post['picture']); ?>" width="48" height="48" alt="<?php echo h($post['name']); ?>" />
                     <p><?php echo makeLink(h($post['message'])); ?><span class="name">（<?php echo h($post['name']); ?>）</span>[<a href="index.php?res=<?php echo h($post['id']); ?>">Re</a>]</p>
 
-                    <p class="day">
 
+
+                    <p class="day">
+                        <!-- リツイート機能　-->
+                        <a href="index.php?rt=<?php echo $post['id']; ?>">
+                            <span class="retweet">
+                                <?php
+                                if (
+                                    rtpost($post['id'], $db) > 0 || retweetCount($post['id'], $db) > 0
+                                ) { ?>
+                                    <img methottype="button" class="retweet-image" src="images/retweet-solid-blue.svg" name="rt" method="get">
+                                <?php } else { ?>
+                                    <img methottype="button" class="retweet-image" src="images/retweet-solid-gray.svg" name="rt" method="get">
+                                <?php } ?>
+                        </a>
+
+                        <?php if (originalpost($post['id'], $db) === true) { //リツイート件数の表示
+                        ?>
+                            <span style="color:gray;"></a><?php echo rtCount($post['id'], $db); //元投稿
+                                                            ?></span>
+                        <?php } else { ?>
+                            <span style="color:gray;"></a><?php echo rtCount(getRetweetPostIdById($post['id'], $db), $db); //リツイート投稿
+                                                            ?></span>
+                        <?php } ?>
+
+                        </span>
                         <!-- いいね機能　-->
                         <a href="index.php?okini=<?php echo $post['id']; ?>">
-
-                            <!-- index.phpにpost_idを送信 -->
-                            <?php if (getFavCount($post['id'], $db) > 0) { ?>
-                                <img methottype="button" class="favorite-image" src="images/heart-solid-red.svg" name="red" method="get">
-                            <?php } else { ?>
-                                <img methottype="button" class="favorite-image" src="images/heart-solid-gray.svg" name="okini" method="get">
-                            <?php } ?>
+                            <span class="favorite">
+                                <?php if (getFavCount($post['id'], $db) > 0) { ?>
+                                    <img methottype="button" class="favorite-image" src="images/heart-solid-red.svg" name="red" method="get">
+                                <?php } else { ?>
+                                    <img methottype="button" class="favorite-image" src="images/heart-solid-gray.svg" name="okini" method="get">
+                                <?php } ?>
                         </a>
+
                         <?php if (FavCount($post['id'], $db) > 0) { ?>
                             <!-- いいね件数の表示 -->
                             <span style="color:gray;"> <?php echo FavCount($post['id'], $db); ?></span>
                         <?php } ?>
 
-                        <!-- リツイート機能 -->
-
-                        <a href="index.php?rt=<?php echo $post['id']; ?>">
-                            <?php if (
-                                retweetCount($post_id, $db) < 0
-                            ) { ?>
-                                <img methottype="button" class="retweet-image" src="images/retweet-solid-gray.svg" name="rt" method="get">
-                            <?php } else { ?>
-                                <?php echo h($member['name']); ?>さんがリツイートをしました。
-                                <img methottype="button" class="retweet-image" src="images/retweet-solid-blue.svg" name="rt" method="get" alt="<?php echo h($post['name']); ?>">
-                                <p><?php echo h($post['message']); ?>
-                                    <span class="retweet">(<?php echo h($post['name']); ?>)
-                                    </span>
-                                <?php } ?>
-                                </p>
-
-                                <span style="color:gray;">12</span>
-                                </span>
-                        </a>
+                        </span>
 
                         <a href="view.php?id=<?php echo h($post['id']); ?>"><?php echo h($post['created']); ?></a>
-
                         <?php
                         if ($post['reply_post_id'] > 0) :
                         ?><a href="view.php?id=<?php echo h($post['reply_post_id']); ?>">
@@ -313,8 +394,8 @@ if ($_GET['okini']) { //いいねボタンがおされたか判定
                 }
                 ?>
             </ul>
+                </div>
         </div>
-    </div>
 </body>
 
 </html>

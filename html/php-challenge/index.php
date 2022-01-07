@@ -158,33 +158,26 @@ function getRetweetPostIdById($id, $db)
     );
     $posts1 = $posts->fetch();
 
+
     return $posts1['retweet_post_id'];
 }
 
-//リツイートをした時の元投稿の内容と元投稿を投稿した人の情報をひっぱってくる
+//押されたpostidを元にpostsのidと比較して一致したidのmessageと元情報を取り出す
 
-function getRetweetPost($db)
+function getRetweetPost($post_id, $db)
 {
-    $rtposts = $db->prepare('SELECT 
-    posts.member_id,
-    posts.message, 
-    members.picture,
-    members.name
-    members.id
-    FROM
-    posts
-    INNER JOIN
-    members
-    ON
-    posts.member_id = members.id');
-    $rtposts->execute();
-    $getrtposts = $rtposts->fetch();
+    $rtposts = $db->prepare('SELECT posts.retweet_post_id, posts.id, posts.message, posts.member_id, members.name, members.picture, members.id 
+    FROM posts 
+    INNER JOIN members 
+    ON posts.member_id = members.id AND posts.id=?');
 
-    echo getRetweetPost($db);
+    $rtposts->execute(array($post_id));
+    $getrtposts = $rtposts->fetch();
+    var_dump($post_id);
+
 
     return $getrtposts;
 }
-
 
 //いいねボタンが押された際の情報の確認と（db）に追加/削除
 
@@ -293,107 +286,112 @@ if ($_GET['rt']) { //リツートボタンを押されたか判断して $data1 
             foreach ($posts as $post) :
             ?>
                 <?php if (originalpost($post['id'], $db) === true) {
-                    if (getRetweetPostIdById($post['id'], $db) > 0); //idを元にretweet_post_idを取得
                     //元投稿
                 ?><?php } else { //リツイート投稿  
-                    echo h($post['name']), "さんがリツイートしました";;
+                    echo h($post['name']), "さんがリツイートしました";
+                    //idを元にメッセージを取得
+                    echo getRetweetPost($_GET['rt'], $db);
+
 
                     ?>
                 <div class="rt">
-
-                <?php } ?>
-                <div class="msg">
-                    <img src="member_picture/<?php echo h($post['picture']); ?>" width="48" height="48" alt="<?php echo h($post['name']); ?>" />
-                    <p><?php echo makeLink(h($post['message'])); ?><span class="name">（<?php echo h($post['name']); ?>）</span>[<a href="index.php?res=<?php echo h($post['id']); ?>">Re</a>]</p>
+                    <img src="member_picture/<?php echo h($post['picture']); ?>" width="48" height="48" alt="<?php echo getRetweetPost($post['name'], $db); ?>" />
+                    <p><?php echo (h($post['message'])); ?><span class="name">（<?php echo h($post['name']); ?>）</span>
 
 
+                    <?php } ?>
+                    <div class="msg">
+                        <img src="member_picture/<?php echo h($post['picture']); ?>" width="48" height="48" alt="<?php echo h($post['name']); ?>" />
+                        <p><?php echo makeLink(h($post['message'])); ?><span class="name">（<?php echo h($post['name']); ?>）</span>[<a href="index.php?res=<?php echo h($post['id']); ?>">Re</a>]</p>
 
-                    <p class="day">
-                        <!-- リツイート機能　-->
-                        <a href="index.php?rt=<?php echo $post['id']; ?>">
-                            <span class="retweet">
-                                <?php
-                                if (
-                                    rtpost($post['id'], $db) > 0 || retweetCount($post['id'], $db) > 0
-                                ) { ?>
-                                    <img methottype="button" class="retweet-image" src="images/retweet-solid-blue.svg" name="rt" method="get">
-                                <?php } else { ?>
-                                    <img methottype="button" class="retweet-image" src="images/retweet-solid-gray.svg" name="rt" method="get">
-                                <?php } ?>
-                        </a>
 
-                        <?php if (originalpost($post['id'], $db) === true) { //リツイート件数の表示
-                        ?>
-                            <span style="color:gray;"></a><?php echo rtCount($post['id'], $db); //元投稿
-                                                            ?></span>
-                        <?php } else { ?>
-                            <span style="color:gray;"></a><?php echo rtCount(getRetweetPostIdById($post['id'], $db), $db); //リツイート投稿
-                                                            ?></span>
-                        <?php } ?>
 
-                        </span>
-                        <!-- いいね機能　-->
-                        <a href="index.php?okini=<?php echo $post['id']; ?>">
-                            <span class="favorite">
-                                <?php if (getFavCount($post['id'], $db) > 0) { ?>
-                                    <img methottype="button" class="favorite-image" src="images/heart-solid-red.svg" name="red" method="get">
-                                <?php } else { ?>
-                                    <img methottype="button" class="favorite-image" src="images/heart-solid-gray.svg" name="okini" method="get">
-                                <?php } ?>
-                        </a>
+                        <p class="day">
+                            <!-- リツイート機能　-->
+                            <a href="index.php?rt=<?php echo $post['id']; ?>">
+                                <span class="retweet">
+                                    <?php
+                                    if (
+                                        rtpost($post['id'], $db) > 0 || retweetCount($post['id'], $db) > 0
+                                    ) { ?>
+                                        <img methottype="button" class="retweet-image" src="images/retweet-solid-blue.svg" name="rt" method="get">
+                                    <?php } else { ?>
+                                        <img methottype="button" class="retweet-image" src="images/retweet-solid-gray.svg" name="rt" method="get">
+                                    <?php } ?>
+                            </a>
 
-                        <?php if (FavCount($post['id'], $db) > 0) { ?>
-                            <!-- いいね件数の表示 -->
-                            <span style="color:gray;"> <?php echo FavCount($post['id'], $db); ?></span>
-                        <?php } ?>
+                            <?php if (originalpost($post['id'], $db) === true) { //リツイート件数の表示
+                            ?>
+                                <span style="color:gray;"></a><?php echo rtCount($post['id'], $db); //元投稿
+                                                                ?></span>
+                            <?php } else { ?>
+                                <span style="color:gray;"></a><?php echo rtCount(getRetweetPostIdById($post['id'], $db), $db); //リツイート投稿
+                                                                echo getRetweetPost($post['id'], $db);              ?></span>
+                            <?php } ?>
 
-                        </span>
+                            </span>
+                            <!-- いいね機能　-->
+                            <a href="index.php?okini=<?php echo $post['id']; ?>">
+                                <span class="favorite">
+                                    <?php if (getFavCount($post['id'], $db) > 0) { ?>
+                                        <img methottype="button" class="favorite-image" src="images/heart-solid-red.svg" name="red" method="get">
+                                    <?php } else { ?>
+                                        <img methottype="button" class="favorite-image" src="images/heart-solid-gray.svg" name="okini" method="get">
+                                    <?php } ?>
+                            </a>
 
-                        <a href="view.php?id=<?php echo h($post['id']); ?>"><?php echo h($post['created']); ?></a>
-                        <?php
-                        if ($post['reply_post_id'] > 0) :
-                        ?><a href="view.php?id=<?php echo h($post['reply_post_id']); ?>">
-                                返信元のメッセージ</a>
-                        <?php
-                        endif;
-                        ?>
-                        <?php
-                        if ($_SESSION['id'] == $post['member_id']) :
-                        ?>
-                            [<a href="delete.php?id=<?php echo h($post['id']); ?>" style="color: #F33;">削除</a>]
-                        <?php
-                        endif;
-                        ?>
-                    </p>
-                </div>
-            <?php
+                            <?php if (FavCount($post['id'], $db) > 0) { ?>
+                                <!-- いいね件数の表示 -->
+                                <span style="color:gray;"> <?php echo FavCount($post['id'], $db); ?></span>
+                            <?php } ?>
+
+                            </span>
+
+                            <a href="view.php?id=<?php echo h($post['id']); ?>"><?php echo h($post['created']); ?></a>
+                            <?php
+                            if ($post['reply_post_id'] > 0) :
+                            ?><a href="view.php?id=<?php echo h($post['reply_post_id']); ?>">
+                                    返信元のメッセージ</a>
+                            <?php
+                            endif;
+                            ?>
+                            <?php
+                            if ($_SESSION['id'] == $post['member_id']) :
+                            ?>
+                                [<a href="delete.php?id=<?php echo h($post['id']); ?>" style="color: #F33;">削除</a>]
+                            <?php
+                            endif;
+                            ?>
+                        </p>
+                    </div>
+                <?php
             endforeach;
-            ?>
+                ?>
 
-            <ul class="paging">
-                <?php
-                if ($page > 1) {
-                ?>
-                    <li><a href="index.php?page=<?php print($page - 1); ?>">前のページへ</a></li>
-                <?php
-                } else {
-                ?>
-                    <li>前のページへ</li>
-                <?php
-                }
-                ?>
-                <?php
-                if ($page < $maxPage) {
-                ?>
-                    <li><a href="index.php?page=<?php print($page + 1); ?>">次のページへ</a></li>
-                <?php
-                } else {
-                ?>
-                    <li>次のページへ</li>
-                <?php
-                }
-                ?>
-            </ul>
+                <ul class="paging">
+                    <?php
+                    if ($page > 1) {
+                    ?>
+                        <li><a href="index.php?page=<?php print($page - 1); ?>">前のページへ</a></li>
+                    <?php
+                    } else {
+                    ?>
+                        <li>前のページへ</li>
+                    <?php
+                    }
+                    ?>
+                    <?php
+                    if ($page < $maxPage) {
+                    ?>
+                        <li><a href="index.php?page=<?php print($page + 1); ?>">次のページへ</a></li>
+                    <?php
+                    } else {
+                    ?>
+                        <li>次のページへ</li>
+                    <?php
+                    }
+                    ?>
+                </ul>
                 </div>
         </div>
 </body>

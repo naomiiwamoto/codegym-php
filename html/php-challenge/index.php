@@ -133,8 +133,6 @@ function rtpost($post_id, $db)
     return $data3['cnt'];
 }
 
-
-
 //リツイート件数
 function rtCount($post_id, $db)
 {
@@ -152,29 +150,28 @@ function rtCount($post_id, $db)
 
 function getRetweetPostIdById($id, $db)
 {
+
     $posts = $db->prepare('SELECT retweet_post_id FROM posts WHERE id=? ');
     $posts->execute(
         array($id)
     );
     $posts1 = $posts->fetch();
 
-
     return $posts1['retweet_post_id'];
 }
 
 //押されたpostidを元にpostsのidと比較して一致したidのmessageと元情報を取り出す
 
-function getRetweetPost($post_id, $db)
+function getRetweetPost($id, $db)
 {
+    $rtid = getRetweetPostIdById($id, $db);
     $rtposts = $db->prepare('SELECT posts.retweet_post_id, posts.id, posts.message, posts.member_id, members.name, members.picture, members.id 
     FROM posts 
     INNER JOIN members 
     ON posts.member_id = members.id AND posts.id=?');
 
-    $rtposts->execute(array($post_id));
+    $rtposts->execute(array($rtid));
     $getrtposts = $rtposts->fetch();
-    var_dump($post_id);
-
 
     return $getrtposts;
 }
@@ -285,27 +282,18 @@ if ($_GET['rt']) { //リツートボタンを押されたか判断して $data1 
             <?php
             foreach ($posts as $post) :
             ?>
-                <?php if (originalpost($post['id'], $db) === true) {
-                    //元投稿
-                ?><?php } else { //リツイート投稿  
-                    echo h($post['name']), "さんがリツイートしました";
-                    //idを元にメッセージを取得
-                    echo getRetweetPost($_GET['rt'], $db);
-
-
-                    ?>
-                <div class="rt">
-                    <img src="member_picture/<?php echo h($post['picture']); ?>" width="48" height="48" alt="<?php echo getRetweetPost($post['name'], $db); ?>" />
-                    <p><?php echo (h($post['message'])); ?><span class="name">（<?php echo h($post['name']); ?>）</span>
-
-
-                    <?php } ?>
+                <?php if (originalpost($post['id'], $db) === true) { ?>
                     <div class="msg">
                         <img src="member_picture/<?php echo h($post['picture']); ?>" width="48" height="48" alt="<?php echo h($post['name']); ?>" />
                         <p><?php echo makeLink(h($post['message'])); ?><span class="name">（<?php echo h($post['name']); ?>）</span>[<a href="index.php?res=<?php echo h($post['id']); ?>">Re</a>]</p>
 
+                    <?php } else { //リツイート投稿  
+                    $rtposts = getRetweetPost($post['id'], $db) ?>
+                        <div class="msg"><?php echo h($post['name']), "さんがリツイートしました"; ?>
+                            <img src="member_picture/<?php echo h($rtposts['picture']); ?>" width="48" height="48" alt="<?php echo h($rtpostss['name']); ?>" />
+                            <p><?php echo ($rtposts['message']); ?><span class="rtname">（<?php echo h($rtposts['name']); ?>）</span>[<a href="index.php?res=<?php echo h($post['id']); ?>">Re</a>]</p>
 
-
+                        <?php } ?>
                         <p class="day">
                             <!-- リツイート機能　-->
                             <a href="index.php?rt=<?php echo $post['id']; ?>">
@@ -326,7 +314,7 @@ if ($_GET['rt']) { //リツートボタンを押されたか判断して $data1 
                                                                 ?></span>
                             <?php } else { ?>
                                 <span style="color:gray;"></a><?php echo rtCount(getRetweetPostIdById($post['id'], $db), $db); //リツイート投稿
-                                                                echo getRetweetPost($post['id'], $db);              ?></span>
+                                                                ?></span>
                             <?php } ?>
 
                             </span>
@@ -363,36 +351,37 @@ if ($_GET['rt']) { //リツートボタンを押されたか判断して $data1 
                             endif;
                             ?>
                         </p>
-                    </div>
-                <?php
-            endforeach;
-                ?>
+                        </div>
 
-                <ul class="paging">
                     <?php
-                    if ($page > 1) {
+                endforeach;
                     ?>
-                        <li><a href="index.php?page=<?php print($page - 1); ?>">前のページへ</a></li>
-                    <?php
-                    } else {
-                    ?>
-                        <li>前のページへ</li>
-                    <?php
-                    }
-                    ?>
-                    <?php
-                    if ($page < $maxPage) {
-                    ?>
-                        <li><a href="index.php?page=<?php print($page + 1); ?>">次のページへ</a></li>
-                    <?php
-                    } else {
-                    ?>
-                        <li>次のページへ</li>
-                    <?php
-                    }
-                    ?>
-                </ul>
-                </div>
+                    <ul class="paging">
+                        <?php
+                        if ($page > 1) {
+                        ?>
+                            <li><a href="index.php?page=<?php print($page - 1); ?>">前のページへ</a></li>
+                        <?php
+                        } else {
+                        ?>
+                            <li>前のページへ</li>
+                        <?php
+                        }
+                        ?>
+                        <?php
+                        if ($page < $maxPage) {
+                        ?>
+                            <li><a href="index.php?page=<?php print($page + 1); ?>">次のページへ</a></li>
+                        <?php
+                        } else {
+                        ?>
+                            <li>次のページへ</li>
+                        <?php
+                        }
+                        ?>
+                    </ul>
+
+                    </div>
         </div>
 </body>
 

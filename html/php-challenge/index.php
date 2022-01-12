@@ -176,6 +176,23 @@ function getRetweetPost($id, $db)
     return $getrtposts;
 }
 
+//同じ投稿のリツイートを探す
+
+function Samepost($id, $db)
+{
+    $rtid = getRetweetPostIdById($id, $db);
+    $SameOriginalPost = $db->prepare('SELECT COUNT(*)FROM posts WHERE retweet_post_id=? AND retweet_post_id>0');
+
+    $SameOriginalPost->execute(array(
+        $rtid,
+
+    ));
+    $OriginalPost = $SameOriginalPost->fetch();
+    var_dump($OriginalPost);
+
+    return $OriginalPost;
+}
+
 //いいねボタンが押された際の情報の確認と（db）に追加/削除
 
 if ($_GET['okini']) { //いいねボタンがおされたか判定
@@ -301,7 +318,8 @@ if ($_GET['rt']) { //リツートボタンを押されたか判断して $data1 
                                     <?php
                                     if (
                                         rtpost($post['id'], $db) > 0 || retweetCount($post['id'], $db) > 0
-                                    ) { ?>
+                                    ) {
+                                    ?>
                                         <img methottype="button" class="retweet-image" src="images/retweet-solid-blue.svg" name="rt" method="get">
                                     <?php } else { ?>
                                         <img methottype="button" class="retweet-image" src="images/retweet-solid-gray.svg" name="rt" method="get">
@@ -319,15 +337,16 @@ if ($_GET['rt']) { //リツートボタンを押されたか判断して $data1 
 
                             </span>
                             <!-- いいね機能　-->
+
                             <a href="index.php?okini=<?php echo $post['id']; ?>">
                                 <span class="favorite">
-                                    <?php if (getFavCount($post['id'], $db) > 0) { ?>
+                                    <?php
+                                    if (getFavCount($post['id'], $db) > 0) { ?>
                                         <img methottype="button" class="favorite-image" src="images/heart-solid-red.svg" name="red" method="get">
                                     <?php } else { ?>
                                         <img methottype="button" class="favorite-image" src="images/heart-solid-gray.svg" name="okini" method="get">
                                     <?php } ?>
                             </a>
-
                             <?php if (FavCount($post['id'], $db) > 0) { ?>
                                 <!-- いいね件数の表示 -->
                                 <span style="color:gray;"> <?php echo FavCount($post['id'], $db); ?></span>
@@ -352,7 +371,6 @@ if ($_GET['rt']) { //リツートボタンを押されたか判断して $data1 
                             ?>
                         </p>
                         </div>
-
                     <?php
                 endforeach;
                     ?>

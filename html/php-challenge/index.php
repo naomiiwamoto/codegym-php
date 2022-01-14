@@ -103,6 +103,7 @@ function myFavCountpost($post_id, $db)
     return false;
 }
 
+
 function getFavCount($post_id, $db)
 { //いいねfavoritesの中身を検索
 
@@ -222,17 +223,24 @@ function getRetweetPost($id, $db)
 //いいねボタンが押された際の情報の確認と（db）に追加/削除
 
 if ($_GET['okini']) { //いいねボタンがおされたか判定
+    $id = $_GET['okini'];
+    $id =  getRetweetPostIdById($_GET['okini'], $db);
     $count = $db->prepare("SELECT COUNT(*) AS cnt FROM favorites WHERE member_id=? AND post_id=?");  //変数に格納　favoritesの中身を検索
     $count->execute(array(
         $member['id'],
-        $_GET['okini']
+        $id
     )); //探す実行
     $record = $count->fetch(); //数字として取り出す
     if ($record['cnt'] > 0) { //一個以上の場合は
         $del = $db->prepare('DELETE FROM favorites WHERE member_id=? AND post_id=? '); //削除できる
         $del->execute(array(
             $member['id'],
-            $_GET['okini'],
+            $id
+        ));
+        $del = $db->prepare('DELETE FROM favorites WHERE member_id=? AND post_id=? '); //削除できる
+        $del->execute(array(
+            $member['id'],
+            $_GET['okini']
         ));
     } else { //ない場合は登録
         $iine = $db->prepare("INSERT INTO favorites SET member_id=?,post_id=?, created=NOW()");
@@ -291,6 +299,7 @@ if ($_GET['rt']) { //リツートボタンを押されたか判断して $data1 
             ));
         }
     }
+
     header('Location: index.php');
     exit();
 }
@@ -343,7 +352,6 @@ if ($_GET['rt']) { //リツートボタンを押されたか判断して $data1 
                         <div class="msg"><?php echo h($post['name']), "さんがリツイートしました"; ?>
                             <img src="member_picture/<?php echo h($rtposts['picture']); ?>" width="48" height="48" alt="<?php echo h($rtpostss['name']); ?>" />
                             <p><?php echo ($rtposts['message']); ?><span class="rtname">（<?php echo h($rtposts['name']); ?>）</span>[<a href="index.php?res=<?php echo h($post['id']); ?>">Re</a>]</p>
-
                         <?php } ?>
                         <p class="day">
                             <!-- リツイート機能　-->

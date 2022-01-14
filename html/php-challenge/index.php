@@ -81,6 +81,27 @@ function FavCount($post_id, $db)
 
     return $posts['cnt'];
 }
+//いいねが元投稿かリツイート投稿か確認
+function myFavCountpost($post_id, $db)
+{
+    if (originalpost($post_id, $db) === true) { //元投稿
+        if (getFavCount($post_id, $db) > 0) { //favoritesに自分のidとpostidで確認 
+            return true;
+        }
+    } else { //リツイート投稿
+        $id = getRetweetPostIdById($post_id, $db);
+        $count = $db->prepare("SELECT COUNT(*) AS cnt FROM favorites WHERE member_id=? AND post_id=?");  //変数に格納　favoritesの中身を検索
+        $count->execute(array(
+            $_SESSION['id'],
+            $id
+        )); //探す実行
+        $record = $count->fetch();
+        if ($record['cnt'] > 0) {
+            return true;
+        }
+    }
+    return false;
+}
 
 function getFavCount($post_id, $db)
 { //いいねfavoritesの中身を検索
@@ -106,6 +127,28 @@ function originalpost($post_id, $db)
     } else {
         return false;
     }
+}
+
+//自分のリツイートか確認する
+function isMyretweetpost($post_id, $db)
+{
+    if (originalpost($post_id, $db) === true) { //元投稿
+        if (retweetCount($post_id, $db) > 0) {
+            return true;
+        }
+    } else { //リツイート投稿
+        $id = getRetweetPostIdById($post_id, $db);
+        $SameOriginalPost = $db->prepare('SELECT COUNT(*) as cnt FROM posts WHERE member_id=? AND retweet_post_id=?');
+        $SameOriginalPost->execute(array(
+            $_SESSION['id'],
+            $id
+        ));
+        $OriginalPost = $SameOriginalPost->fetch();
+        if ($OriginalPost['cnt'] > 0) {
+            return true;
+        }
+    }
+    return false;
 }
 
 //元投稿からrtを探す
@@ -176,22 +219,6 @@ function getRetweetPost($id, $db)
     return $getrtposts;
 }
 
-//同じ投稿のリツイートを探す
-function originalRetweetedPost($id, $db)
-{
-    $SameOriginalPost = $db->prepare('SELECT COUNT(*) AS cnt FROM posts WHERE member_id=? AND retweet_post_id=?');
-
-    $SameOriginalPost->execute(array(
-        $_SESSION['id'],
-        $id
-    ));
-    $OriginalPost = $SameOriginalPost->fetch();
-    var_dump($OriginalPost);
-
-    return $OriginalPost;
-}
-
-
 //いいねボタンが押された際の情報の確認と（db）に追加/削除
 
 if ($_GET['okini']) { //いいねボタンがおされたか判定
@@ -208,17 +235,26 @@ if ($_GET['okini']) { //いいねボタンがおされたか判定
             $_GET['okini'],
         ));
     } else { //ない場合は登録
-        $iine = $db->prepare("INSERT INTO favorites SET member_id=?,post_id=?, created=NOW()"); //はいっていない場合情報を導入
+        $iine = $db->prepare("INSERT INTO favorites SET member_id=?,post_id=?, created=NOW()");
         $iine->execute(array(
             $member['id'],
             $_GET['okini']
+        ));
+        if (originalpost($post_id, $db) === true) {
+            $id = $_GET['okini'];
+        } else {
+            $id =  getRetweetPostIdById($_GET['okini'], $db);
+        }
+        $iine = $db->prepare("INSERT INTO favorites SET member_id=?,post_id=?, created=NOW()");
+        $iine->execute(array(
+            $member['id'],
+            $id
         ));
     }
 
     header('Location: index.php');
     exit();
 }
-
 
 //実際にrtボタンが押された時の流れ 
 
@@ -255,7 +291,6 @@ if ($_GET['rt']) { //リツートボタンを押されたか判断して $data1 
             ));
         }
     }
-
     header('Location: index.php');
     exit();
 }
@@ -309,7 +344,6 @@ if ($_GET['rt']) { //リツートボタンを押されたか判断して $data1 
                             <img src="member_picture/<?php echo h($rtposts['picture']); ?>" width="48" height="48" alt="<?php echo h($rtpostss['name']); ?>" />
                             <p><?php echo ($rtposts['message']); ?><span class="rtname">（<?php echo h($rtposts['name']); ?>）</span>[<a href="index.php?res=<?php echo h($post['id']); ?>">Re</a>]</p>
 
-
                         <?php } ?>
                         <p class="day">
                             <!-- リツイート機能　-->
@@ -317,7 +351,7 @@ if ($_GET['rt']) { //リツートボタンを押されたか判断して $data1 
                                 <span class="retweet">
                                     <?php
                                     if (
-                                        rtpost($post['id'], $db) > 0 || retweetCount($post['id'], $db) > 0 || originalRetweetedPost($post['id'], $db) > 0
+                                        isMyretweetpost($post['id'], $db, $id) === true
                                     ) {
                                     ?>
                                         <img methottype="button" class="retweet-image" src="images/retweet-solid-blue.svg" name="rt" method="get">
@@ -325,7 +359,6 @@ if ($_GET['rt']) { //リツートボタンを押されたか判断して $data1 
                                         <img methottype="button" class="retweet-image" src="images/retweet-solid-gray.svg" name="rt" method="get">
                                     <?php } ?>
                             </a>
-
                             <?php if (originalpost($post['id'], $db) === true) { //リツイート件数の表示
                             ?>
                                 <span style="color:gray;"></a><?php echo rtCount($post['id'], $db); //元投稿
@@ -337,20 +370,24 @@ if ($_GET['rt']) { //リツートボタンを押されたか判断して $data1 
 
                             </span>
                             <!-- いいね機能　-->
-
                             <a href="index.php?okini=<?php echo $post['id']; ?>">
                                 <span class="favorite">
+
                                     <?php
-                                    if (getFavCount($post['id'], $db) > 0) { ?>
+                                    if (myFavCountpost($post['id'], $db) === true) {
+                                    ?>
                                         <img methottype="button" class="favorite-image" src="images/heart-solid-red.svg" name="red" method="get">
                                     <?php } else { ?>
                                         <img methottype="button" class="favorite-image" src="images/heart-solid-gray.svg" name="okini" method="get">
-                                    <?php } ?>
+                                    <?php }
+                                    ?>
                             </a>
-                            <?php if (FavCount($post['id'], $db) > 0) { ?>
-                                <!-- いいね件数の表示 -->
+                            <!-- いいね件数の表示 -->
+                            <?php if (originalpost($post['id'], $db) === true) { ?>
                                 <span style="color:gray;"> <?php echo FavCount($post['id'], $db); ?></span>
-                            <?php } else { ?> <span style="color:gray;"> <?php echo FavCount(getRetweetPostIdById($post['id'], $db), $db); ?></span><?php } ?>
+                            <?php } else { ?>
+                                <span style="color:gray;"> <?php echo FavCount(getRetweetPostIdById($post['id'], $db), $db); ?></span>
+                            <?php } ?>
                             </span>
                             <a href="view.php?id=<?php echo h($post['id']); ?>"><?php echo h($post['created']); ?></a>
                             <?php
@@ -396,7 +433,6 @@ if ($_GET['rt']) { //リツートボタンを押されたか判断して $data1 
                         }
                         ?>
                     </ul>
-
                     </div>
         </div>
 </body>

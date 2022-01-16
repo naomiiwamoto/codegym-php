@@ -71,8 +71,32 @@ function h($value)
     return htmlspecialchars($value, ENT_QUOTES, 'UTF-8');
 }
 
-///いいね件数を取得
+//いいね機能
+function getfavpost($post_id, $db)
+{
+    $count = $db->prepare("SELECT COUNT(*) AS cnt FROM favorites WHERE member_id=? AND post_id=?");
+    $count->execute(array(
+        $_SESSION['id'],
+        $post_id
+    ));
+    $record = $count->fetch();
+    if ($record['cnt'] > 0) {
+        $del = $db->prepare('DELETE FROM favorites WHERE member_id=? AND post_id=? ');
+        $del->execute(array(
+            $_SESSION['id'],
+            $post_id
+        ));
+    } else {
+        $iine = $db->prepare("INSERT INTO favorites SET member_id=?,post_id=?, created=NOW()");
+        $iine->execute(array(
+            $_SESSION['id'],
+            $post_id
+        ));
+    }
+    return;
+}
 
+///いいね件数を取得
 function FavCount($post_id, $db)
 {
     $post = $db->prepare('SELECT COUNT(*) AS cnt FROM favorites WHERE post_id=?');
@@ -81,6 +105,7 @@ function FavCount($post_id, $db)
 
     return $posts['cnt'];
 }
+
 //いいねが元投稿かリツイート投稿か確認
 function myFavCountpost($post_id, $db)
 {
@@ -103,10 +128,9 @@ function myFavCountpost($post_id, $db)
     return false;
 }
 
-
+//いいねfavoritesの中身を検索
 function getFavCount($post_id, $db)
-{ //いいねfavoritesの中身を検索
-
+{
     $count = $db->prepare("SELECT COUNT(*) AS cnt FROM favorites WHERE member_id=? AND post_id=?");  //変数に格納　favoritesの中身を検索
     $count->execute(array(
         $_SESSION['id'],
@@ -191,7 +215,6 @@ function rtCount($post_id, $db)
 }
 
 //idを元にretweet_post_idを取得
-
 function getRetweetPostIdById($id, $db)
 {
 
@@ -205,7 +228,6 @@ function getRetweetPostIdById($id, $db)
 }
 
 //押されたpostidを元にpostsのidと比較して一致したidのmessageと元情報を取り出す
-
 function getRetweetPost($id, $db)
 {
     $rtid = getRetweetPostIdById($id, $db);
@@ -220,52 +242,18 @@ function getRetweetPost($id, $db)
     return $getrtposts;
 }
 
-//いいねボタンが押された際の情報の確認と（db）に追加/削除
-
-if ($_GET['okini']) { //いいねボタンがおされたか判定
-    $id = $_GET['okini'];
-    $id =  getRetweetPostIdById($_GET['okini'], $db);
-    $count = $db->prepare("SELECT COUNT(*) AS cnt FROM favorites WHERE member_id=? AND post_id=?");  //変数に格納　favoritesの中身を検索
-    $count->execute(array(
-        $member['id'],
-        $id
-    )); //探す実行
-    $record = $count->fetch(); //数字として取り出す
-    if ($record['cnt'] > 0) { //一個以上の場合は
-        $del = $db->prepare('DELETE FROM favorites WHERE member_id=? AND post_id=? '); //削除できる
-        $del->execute(array(
-            $member['id'],
-            $id
-        ));
-        $del = $db->prepare('DELETE FROM favorites WHERE member_id=? AND post_id=? '); //削除できる
-        $del->execute(array(
-            $member['id'],
-            $_GET['okini']
-        ));
-    } else { //ない場合は登録
-        $iine = $db->prepare("INSERT INTO favorites SET member_id=?,post_id=?, created=NOW()");
-        $iine->execute(array(
-            $member['id'],
-            $_GET['okini']
-        ));
-        if (originalpost($post_id, $db) === true) {
-            $id = $_GET['okini'];
+$id =  getRetweetPostIdById($_GET['okini'], $db); { //いいねボタンがおされた時の流れ
+    if ($_GET['okini'])
+        if (originalpost($_GET['okini'], $db) === true) { //リツイート投稿か元投稿か比較　
+            getfavpost($_GET['okini'], $db);
         } else {
-            $id =  getRetweetPostIdById($_GET['okini'], $db);
+            getfavpost($id, $db);
         }
-        $iine = $db->prepare("INSERT INTO favorites SET member_id=?,post_id=?, created=NOW()");
-        $iine->execute(array(
-            $member['id'],
-            $id
-        ));
-    }
-
     header('Location: index.php');
     exit();
 }
 
 //実際にrtボタンが押された時の流れ 
-
 if ($_GET['rt']) { //リツートボタンを押されたか判断して $data1 = originalpost($_GET['rt'], $db); //idを検索して、どの行か確認する必要がある
     if (originalpost($_GET['rt'], $db)) { //元投稿か調べる
         if (retweetCount($_GET['rt'], $db) > 0) { //元投稿の場合は$メンバーidとリツイートポストidで検索をする　

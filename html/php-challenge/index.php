@@ -242,13 +242,13 @@ function getRetweetPost($id, $db)
     return $getrtposts;
 }
 
-$id =  getRetweetPostIdById($_GET['okini'], $db); { //いいねボタンがおされた時の流れ
-    if ($_GET['okini'])
-        if (originalpost($_GET['okini'], $db) === true) { //リツイート投稿か元投稿か比較　
-            getfavpost($_GET['okini'], $db);
-        } else {
-            getfavpost($id, $db);
-        }
+$id =  getRetweetPostIdById($_GET['okini'], $db); //いいねボタンがおされた時の流れ
+if ($_GET['okini']) {
+    if (originalpost($_GET['okini'], $db) === true) { //リツイート投稿か元投稿か比較　
+        getfavpost($_GET['okini'], $db);
+    } else {
+        getfavpost($id, $db);
+    }
     header('Location: index.php');
     exit();
 }
